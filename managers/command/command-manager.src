@@ -39,6 +39,7 @@ CommandManager.run = function()
         self.printCommandResult(resultOfExecution)
     end while
 end function
+CommandManager.riskyCommands = ["rm", "get", "put", "sudo", "prox"]
 CommandManager.tick = function()
     if self.queue.len() == 0 then return
     command = self.queue.pull()
@@ -46,7 +47,36 @@ CommandManager.tick = function()
     self.history.insert(0, command)
     hasPermissions = self.checkPermissions(command[0])
     if hasPermissions isa Error then return hasPermissions
-    return command[0].execute(command[1], self.mediator)
+    result = command[0].execute(command[1], self.mediator)
+    if self.riskyCommands.indexOf(command[0].name) != null then self.autoClean()
+    return result
+end function
+// Legitimate-only auto-scrub: runs purely through GreyScript on a shell you
+// already hold root on (same createFile+move overwrite silentclean/rclean use),
+// right after any command that could have triggered a loggable server action.
+// No server-side code, no access beyond what the player already has -- this is
+// the only form of "automatic" Weaver that can exist against a server you don't
+// control, since the real C# scrub patch is deliberately inert there by design.
+// Respects the same weaver on/off opt-out marker, checked on the player's own
+// pivot machine (not the target), matching the weaver command's own logic.
+CommandManager.autoClean = function()
+    sessionManager = self.mediator.getExtension("sessionManager")
+    pivotHandler = sessionManager.pivotSession.handler
+    weaverUser = getUserFromHandler(pivotHandler)
+    if weaverUser == "root" then optPath = "/root/.weaver_off" else optPath = "/home/" + weaverUser + "/.weaver_off"
+    optFile = pivotHandler.getFile(optPath)
+    if not (optFile isa Error) then return
+
+    session = sessionManager.currentSession
+    if session == null then return
+    handler = session.handler
+    if handler.type() != "shell" then return
+    if handler.user != "root" then return
+    logFile = handler.getFile("/var/system.log")
+    if logFile isa Error then return
+    res = handler.createFile("/var/.wv_tmp")
+    if res isa Error then return
+    handler.move("/var/.wv_tmp", "/var/system.log")
 end function
 CommandManager.checkPermissions = function(command)
     sessionManager = self.mediator.getExtension("sessionManager")
