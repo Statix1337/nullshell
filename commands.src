@@ -1,0 +1,1307 @@
+
+lsCommandHandler = function(params, extensionMediator)
+    nullshellUi = extensionMediator.getExtension("nullshellUi")
+    sessionManager = extensionMediator.getExtension("sessionManager")
+    session = sessionManager.currentSession
+    handler = session.handler
+    path = params.path
+
+    file = handler.getFile(path)
+    if file isa Error then return file
+    if file.children isa Error then return file.children
+
+    nullshellUi.ls(file.children)
+end function
+commandManager.registerCommand(Command.New({     "name": "ls",     "description": "List all items in the provided directory",     "parameters": [         Parameter.New({             "name": "path",             "required": false,             "default": "."         })     ],     "callback": @lsCommandHandler }))
+
+fsCommandHandler = function(params, extensionMediator)
+    nullshellUi = extensionMediator.getExtension("nullshellUi")
+    sessionManager = extensionMediator.getExtension("sessionManager")
+    session = sessionManager.currentSession
+    handler = session.handler
+    path = params.path
+
+    file = handler.getFile(path)
+    if file isa Error then return file
+    nullshellUi.fileSystem(file)
+end function
+commandManager.registerCommand(Command.New({     "name": "fs",     "description": "Display file system information",     "parameters": [         Parameter.New({             "name": "path",             "required": false,             "default": "/"         })     ],     "callback": @fsCommandHandler }))
+
+cdCommandHandler = function(params, extensionMediator)
+    sessionManager = extensionMediator.getExtension("sessionManager")
+    session = sessionManager.currentSession
+    handler = session.handler
+    path = params.path
+
+    return handler.goTo(path)
+end function
+commandManager.registerCommand(Command.New({     "name": "cd",     "description": "Change directory",     "parameters": [         Parameter.New({             "name": "path",             "required": true         })     ],     "callback": @cdCommandHandler }))
+
+chmodCommandHandler = function (params, extensionMediator)
+    sessionManager = extensionMediator.getExtension("sessionManager")
+    session = sessionManager.currentSession
+    handler = session.handler
+    fpath = params.fpath
+    perms = params.perms
+    recursive = params.recursive
+
+    return handler.setPermissions(fpath, perms, recursive)
+end function
+commandManager.registerCommand(Command.New({     "name": "chmod",     "description": "Chmods a file or directory.",     "parameters": [         FlagParameter.New({         "name": "recursive",         "required": false,         "default": "",             "flag": "-R"         }),         Parameter.New({             "name": "perms",             "required": true         }),         Parameter.New({             "name": "fpath",             "required": true         })     ],     "callback": @chmodCommandHandler }))
+
+chownCommandHandler = function (params, extensionMediator)
+    sessionManager = extensionMediator.getExtension("sessionManager")
+    session = sessionManager.currentSession
+    handler = session.handler
+    fpath = params.fpath
+    newOwner = params.newOwner
+    recursive = params.recursive
+    
+    return handler.setOwner(fpath, newOwner, recursive)
+end function
+commandManager.registerCommand(Command.New({     "name": "chown",     "description": "Changes the owner of a file or directory.",     "parameters": [         FlagParameter.New({         "name": "recursive",         "required": false,         "default": "",             "flag": "-R"         }),         Parameter.New({             "name": "newOwner",             "required": true         }),         Parameter.New({             "name": "fpath",             "required": true         })     ],     "callback": @chownCommandHandler }))
+
+chgrpCommandHandler = function (params, extensionMediator)
+    sessionManager = extensionMediator.getExtension("sessionManager")
+    session = sessionManager.currentSession
+    handler = session.handler
+    fpath = params.fpath
+    newGroup = params.newGroup
+    recursive = params.recursive
+    
+    return handler.setGroup(fpath, newGroup, recursive)
+end function
+commandManager.registerCommand(Command.New({     "name": "chgrp",     "description": "Changes the group of a file or directory.",     "parameters": [         FlagParameter.New({         "name": "recursive",         "required": false,         "default": "",             "flag": "-R"         }),         Parameter.New({             "name": "newGroup",             "required": true         }),         Parameter.New({             "name": "fpath",             "required": true         })     ],     "callback": @chgrpCommandHandler }))
+
+mvCommandHandler = function(params, extensionMediator)
+    sessionManager = extensionMediator.getExtension("sessionManager")
+    session = sessionManager.currentSession
+    handler = session.handler
+    path = params.path
+    newPath = params.newPath
+
+    return handler.move(path, newPath)
+end function
+commandManager.registerCommand(Command.New({     "name": "mv",     "description": "Move a file or directory",     "parameters": [         Parameter.New({             "name": "path",             "required": true         }),         Parameter.New({             "name": "newPath",             "required": true         })     ],     "callback": @mvCommandHandler }))
+
+writeCommandHandler = function(params, extensionMediator)
+    sessionManager = extensionMediator.getExtension("sessionManager")
+    session = sessionManager.currentSession
+    handler = session.handler
+    path = params.path
+    type = params.type
+    content = params.content
+
+    file = handler.getFile(path)
+    if file isa Error then return file
+
+    if type == ">" then
+        file.setContent(content)
+    else
+        file.appendContent(content)
+    end if
+end function
+commandManager.registerCommand(Command.New({     "name": "write",     "description": "Write to a file",     "parameters": [         Parameter.New({             "name": "path",             "required": true         }),         OptionsParameter.New({             "name": "type",             "required": true,             "options": {                 ">": ">",                 ">>": ">>"             }         }),         RestParameter.New({             "name": "content",             "required": false,             "default": ""         })     ],     "callback": @writeCommandHandler }))
+
+
+corruptLogsCommandHandler = function(params, extensionMediator)
+    sessionManager = extensionMediator.getExtension("sessionManager")
+    session = sessionManager.currentSession
+    handler = session.handler
+
+    if handler.type() == "file" then return Error.New("Handler is not a shell or computer")
+    if handler.user != "root" then return Error.New("You must be root to corrupt the logs")
+
+    logFile = handler.getFile("/var/system.log")
+    if logFile isa Error then return Error.New("Failed to get log file")
+    handler.createFile("/var/t")
+    handler.move("/var/t", "/var/system.log")
+    return "Corrupted logs"
+end function
+commandManager.registerCommand(Command.New({     "name": "corruptlogs",     "description": "Corrupt the logs",     "parameters": [],     "callback": @corruptLogsCommandHandler,     "permissions": {         "object": "computer",         "privilege": "root"     } }))
+
+cpCommandHandler = function(params, extensionMediator)
+    sessionManager = extensionMediator.getExtension("sessionManager")
+    session = sessionManager.currentSession
+    handler = session.handler
+    path = params.path
+    newPath = params.newPath
+
+    return handler.copy(path, newPath)
+end function
+commandManager.registerCommand(Command.New({     "name": "cp",     "description": "Copy a file or directory",     "parameters": [         Parameter.New({             "name": "path",             "required": true         }),         Parameter.New({             "name": "newPath",             "required": true         })     ],     "callback": @cpCommandHandler }))
+
+catCommandHandler = function(params, extensionMediator)
+    sessionManager = extensionMediator.getExtension("sessionManager")
+    session = sessionManager.currentSession
+    handler = session.handler
+    path = params.path
+
+    file = handler.getFile(path)
+
+    if file isa Error then return print(file.message)
+    return file.content
+end function
+commandManager.registerCommand(Command.New({     "name": "cat",     "description": "Print the contents of a file",     "parameters": [         Parameter.New({             "name": "path",             "required": true         })     ],     "callback": @catCommandHandler }))
+
+touchCommandHandler = function(params, extensionMediator)
+    sessionManager = extensionMediator.getExtension("sessionManager")
+    session = sessionManager.currentSession
+    handler = session.handler
+    path = params.path
+
+    return handler.createFile(path)
+end function
+commandManager.registerCommand(Command.New({     "name": "touch",     "description": "Create a file",     "parameters": [         Parameter.New({             "name": "path",             "required": true         })     ],     "callback": @touchCommandHandler,     "permissions": {         "object": "computer"     } }))
+
+mkdirCommandHandler = function(params, extensionMediator)
+    sessionManager = extensionMediator.getExtension("sessionManager")
+    session = sessionManager.currentSession
+    handler = session.handler
+    path = params.path
+
+    return handler.createFolder(path)
+end function
+commandManager.registerCommand(Command.New({     "name": "mkdir",     "description": "Create a directory",     "parameters": [         Parameter.New({             "name": "path",             "required": true         })     ],     "callback": @mkdirCommandHandler,     "permissions": {         "object": "computer"     } }))
+
+rmCommandHandler = function(params, extensionMediator)
+    sessionManager = extensionMediator.getExtension("sessionManager")
+    session = sessionManager.currentSession
+    handler = session.handler
+    path = params.path
+
+    return handler.delete(path)
+end function
+commandManager.registerCommand(Command.New({     "name": "rm",     "description": "Delete a file or directory",     "parameters": [         Parameter.New({             "name": "path",             "required": true         })     ],     "callback": @rmCommandHandler }))
+
+crackCommandHandler = function(params, extensionMediator)
+    libMannager = extensionMediator.getExtension("libManager")
+    lib = libMannager.getCurrentLib("crypto")
+    if lib == null then return Error.New("No crypto library loaded")
+
+    hash = params.hash
+    result = lib.lib.decipher(hash)
+    return result
+end function
+commandManager.registerCommand(Command.New({     "name": "crack",     "description": "Crack a hash",     "parameters": [         Parameter.New({             "name": "hash",             "required": true         })     ],     "callback": @crackCommandHandler }))
+
+nmapCommandHandler = function(params, extensionMediator)
+    nullshellUi = extensionMediator.getExtension("nullshellUi")
+    ip = params.ip
+
+    if ip == "random" then ip = randomIp()
+
+    router = Router.New(ip)
+    if router isa Error then return router
+    devices = router.devices()
+
+    allPorts = []
+    handleAddDevice = function(device)
+        if device.value.len == 0 then allPorts.push({"port": "none", "open": false, "forwarded": false, "local": device.key, "type": "none", "version": "none"})
+        for port in device.value
+            allPorts.push(port)
+        end for
+    end function
+    forEach(devices, @handleAddDevice)
+
+    allPorts.sort("port")
+
+    nullshellUi.nmap(allPorts, router)
+end function
+commandManager.registerCommand(Command.New({     "name": "nmap",     "description": "Scan the network for devices",     "parameters": [         OptionsParameter.New({             "name": "ip",             "required": false,             "options": {                 "ip": "ip",                 "random": "random"             },             "default": "random"         })     ],     "callback": @nmapCommandHandler }))
+
+whoisCommandHandler = function(params, extensionMediator)
+    nullshellUi = extensionMediator.getExtension("nullshellUi")
+    ip = params.ip
+
+    adminInfo = whois(ip)
+    infoLines = adminInfo.split(char(10))
+
+    infoObject = {}
+    infoObject.domainName = infoLines[0].split(":")[1].trim
+    infoObject.adminContact = infoLines[1].split(":")[1].trim
+    infoObject.email = infoLines[2].split(":")[1].trim
+    infoObject.phone = infoLines[3].split(":")[1].trim
+
+    nullshellUi.whois(infoObject)
+end function
+commandManager.registerCommand(Command.New({     "name": "whois",     "description": "Get information about an IP",     "parameters": [         Parameter.New({             "name": "ip",             "required": true         })     ],     "callback": @whoisCommandHandler }))
+
+sshCommandHandler = function(params, extensionMediator)
+    sessionManager = extensionMediator.getExtension("sessionManager")
+    session = sessionManager.currentSession
+    handler = session.handler
+
+    ip = params.ip
+    username = params.username
+    password = params.password
+    port = params.port
+    service = params.service
+
+    result = handler.connectTo(ip, port, username, password, service)
+    if result isa Error then return result
+
+    session = sessionManager.addSession(result, {})
+    sessionManager.setCurrentSession(sessionManager.getSessionIndex(session))
+end function
+commandManager.registerCommand(Command.New({     "name": "ssh",     "description": "Login to a computer",     "parameters": [         Parameter.New({             "name": "ip",             "required": true         }),         Parameter.New({             "name": "username",             "required": true         }),         Parameter.New({             "name": "password",             "required": true         }),         Parameter.New({             "name": "port",             "required": false,             "type": PARAMETER_TYPES.NUMBER,             "default": 22         }),         OptionsParameter.New({             "name": "service",             "required": false,             "options": {                 "ssh": "ssh",                 "ftp": "ftp",             },             "default": "ssh"         })     ],     "callback": @sshCommandHandler,     "permissions": {         "object": "shell"     } }))
+
+passwdCommandHandler = function(params, extensionMediator)
+    sessionManager = extensionMediator.getExtension("sessionManager")
+    session = sessionManager.currentSession
+    handler = session.handler
+    username = params.username
+    password = params.password
+
+    result = handler.setPassword(username, password)
+    if result isa Error then return result
+end function
+commandManager.registerCommand(Command.New({     "name": "passwd",     "description": "Change a user's password",     "parameters": [         Parameter.New({             "name": "username",             "required": true         }),         Parameter.New({             "name": "password",             "required": true         })     ],     "callback": @passwdCommandHandler,     "permissions": {         "object": "computer",         "privilege": "root"     } }))
+
+exploitScanCommandHandler = function(params, extensionMediator)
+    address = params.address
+    port = params.port
+    options = params.options
+
+    libManager = extensionMediator.getExtension("libManager")
+
+    // Fixed from upstream Viper: the port-required check used to run AFTER
+    // calling metaxploitManager.hack(), so a remote-IP scan with no port ever
+    // reached the friendly "Port is required" error -- it crashed first inside
+    // the native metaxploit.so getLib() call with a raw "Port is null" runtime
+    // error instead. Validate before calling hack().
+    if is_valid_ip(address) and port == null then return Error.New("Port is required")
+
+    metaxploitManager = extensionMediator.getExtension("metaxploitManager")
+    objects = metaxploitManager.hack(address, port, options)
+
+    if objects isa Error then return objects
+
+    if not is_valid_ip(address) then
+        lib = libManager.getCurrentLib("metaxploit")
+        sessionAddress = lib.data.ip
+    else
+        resolvedAddress = address
+        if is_lan_ip(address) then resolvedAddress = libManager.getCurrentLib("metaxploit").data.ip.public
+        router = Router.New(resolvedAddress)
+        if router isa Error then return router
+        devices = router.devices()
+
+        handleFindPort = function(device)
+            for p in device.value
+                if (p.open or p.port == 8080) and p.port == to_int(port) then return true
+            end for
+            return false
+        end function
+        device = find(devices, @handleFindPort)
+        if device == null then return Error.New("Port is not open/found")
+        sessionAddress = {             "local": device.key,             "public": resolvedAddress         }
+    end if
+
+    sessionManager = extensionMediator.getExtension("sessionManager")
+    handleAddSessionObject = function(object)
+        sessionManager.addSession(object, { "ip": sessionAddress })
+    end function
+    forEach(objects, @handleAddSessionObject)
+end function
+commandManager.registerCommand(Command.New({     "name": "exploitscan",     "description": "Scan the network for exploits",     "parameters": [         Parameter.New({             "name": "address",             "required": true         }),         Parameter.New({             "name": "port",             "required": false         }),         Parameter.New({             "name": "options",             "required": false         })     ],     "callback": @exploitScanCommandHandler }))
+
+targetsCommandHandler = function(params, extensionMediator)
+    nullshellUi = extensionMediator.getExtension("nullshellUi")
+    sessionManager = extensionMediator.getExtension("sessionManager")
+    sessions = sessionManager.sessions
+
+    nullshellUi.targets(sessions)
+end function
+commandManager.registerCommand(Command.New({     "name": "targets",     "description": "List all targets",     "parameters": [],     "callback": @targetsCommandHandler }))
+
+delTargetCommandHandler = function(params, extensionMediator)
+    sessionManager = extensionMediator.getExtension("sessionManager")
+    sessions = sessionManager.sessions
+    sessionIndex = params.sessionIndex
+    count = params.count
+
+    for i in range(sessionIndex, sessionIndex + count - 1)
+        if i >= sessions.len then break
+        session = sessionManager.removeSession(sessionIndex)
+        if session isa Error then break
+    end for
+end function
+commandManager.registerCommand(Command.New({     "name": "deltarget",     "description": "Delete a target",     "parameters": [         Parameter.New({             "name": "sessionIndex",             "required": true,             "type": PARAMETER_TYPES.NUMBER         }),         Parameter.New({             "name": "count",             "required": false,             "type": PARAMETER_TYPES.NUMBER,             "default": 1         })     ],     "callback": @delTargetCommandHandler }))
+
+useCommandHandler = function(params, extensionMediator)
+    sessionManager = extensionMediator.getExtension("sessionManager")
+    sessions = sessionManager.sessions
+    sessionIndex = params.sessionIndex
+
+    session = sessionManager.setCurrentSession(sessionIndex)
+    if session isa Error then return session
+end function
+commandManager.registerCommand(Command.New({     "name": "use",     "description": "Use a target",     "parameters": [         Parameter.New({             "name": "sessionIndex",             "required": true,             "type": PARAMETER_TYPES.NUMBER         })     ],     "callback": @useCommandHandler }))
+
+libsCommandHandler = function(params, extensionMediator)
+    nullshellUi = extensionMediator.getExtension("nullshellUi")
+    libraryManager = extensionMediator.getExtension("libManager")
+    libraries = libraryManager.libs
+    currentLibs = libraryManager.currentLibs
+    pivotLibs = libraryManager.pivotLibs
+
+    libsHasLib = function(libs ,lib)
+        handleSome = function(libsLib)
+            if libsLib.value == lib then return true
+        end function
+        return some(libs, @handleSome)
+    end function
+
+    handleMapLibs = function(lib)
+        return {             "lib": lib,             "current": libsHasLib(currentLibs, lib),             "pivot": libsHasLib(pivotLibs, lib)         }
+    end function
+    nullshellUi.libs(map(libraries, @handleMapLibs))
+end function
+commandManager.registerCommand(Command.New({     "name": "libs",     "description": "List all libraries",     "parameters": [],     "callback": @libsCommandHandler }))
+
+useLibCommandHandler = function(params, extensionMediator)
+    libraryManager = extensionMediator.getExtension("libManager")
+    libraries = libraryManager.libs
+    libraryIndex = params.libraryIndex
+
+    lib = libraryManager.getLib(libraryIndex)
+    if lib isa Error then return lib
+
+    library = libraryManager.setCurrentLib(lib)
+    if library isa Error then return library
+end function
+commandManager.registerCommand(Command.New({     "name": "uselib",     "description": "Use a library",     "parameters": [         Parameter.New({             "name": "libraryIndex",             "required": true,             "type": PARAMETER_TYPES.NUMBER         })     ],     "callback": @useLibCommandHandler }))
+
+usePivotLibCommandHandler = function(params, extensionMediator)
+    libraryManager = extensionMediator.getExtension("libManager")
+    libraries = libraryManager.libs
+    libraryIndex = params.libraryIndex
+
+    lib = libraryManager.getLib(libraryIndex)
+    if lib isa Error then return lib
+
+    library = libraryManager.setPivotLib(lib)
+    if library isa Error then return library
+end function
+commandManager.registerCommand(Command.New({     "name": "usepivotlib",     "description": "Use a library as a pivot",     "parameters": [         Parameter.New({             "name": "libraryIndex",             "required": true,             "type": PARAMETER_TYPES.NUMBER         })     ],     "callback": @usePivotLibCommandHandler }))
+
+addLibCommandHandler = function(params, extensionMediator)
+    sessionManager = extensionMediator.getExtension("sessionManager")
+    libManager = extensionMediator.getExtension("libManager")
+
+    session = sessionManager.currentSession
+    handler = session.handler
+
+    path = params.path
+    jumpfileLocation = params.jumpfileLocation
+
+    file = handler.getFile(path)
+    if file isa Error then return file
+
+    if jumpfileLocation == null then
+        pivotSession = sessionManager.pivotSession
+        pivotHandler = pivotSession.handler
+
+        lib = include_lib(file.path())
+        if lib == null then return Error.New("Failed to include library")
+        libManager.addLib(lib, { "path": file.path(), "ip": pivotHandler.ip })
+    else
+        jumpFile = handler.getFile(jumpfileLocation)
+        if jumpFile isa Error then return jumpFile
+
+        handler.executeFile(jumpfileLocation, "getLib " + file.path())
+        if not get_custom_object.hasIndex("lib") then return Error.New("Failed to include library")
+        lib = get_custom_object.lib
+        if lib == null then return Error.New("Failed to include library")
+        libManager.addLib(lib, { "path": file.path(), "ip": handler.ip })
+    end if
+end function
+commandManager.registerCommand(Command.New({     "name": "addlib",     "description": "Add a library",     "parameters": [         Parameter.New({             "name": "path",             "required": true         }),         Parameter.New({             "name": "jumpfileLocation",             "required": false         })     ],     "callback": @addLibCommandHandler,     "permissions": {         "object": "shell"     } }))
+
+jumpFileCommandHandler = function(params, extensionMediator)
+    sessionManager = extensionMediator.getExtension("sessionManager")
+    session = sessionManager.currentSession
+    handler = session.handler
+    path = params.path
+
+    file = handler.createFile(path + "/jumpfile.src")
+    if file isa Error then
+        handler.delete(path + "/jumpfile.src")
+        if file isa Error then return file
+        file = handler.createFile(path + "/jumpfile.src")
+        if file isa Error then return file
+    end if
+
+    file = handler.getFile(path + "/jumpfile.src")
+    if file isa Error then return file
+
+    file.setContent(jumpfileText)
+
+    result = handler.buildFile(file.path(), handler.getFile(path).path())
+    if result isa Error then return result
+
+    file.delete()
+end function
+commandManager.registerCommand(Command.New({     "name": "jumpfile",     "description": "Create a jump file",     "parameters": [         Parameter.New({             "name": "path",             "required": false,             "default": "."         })     ],     "callback": @jumpFileCommandHandler,     "permissions": {         "object": "shell"     } }))
+
+executeCommandHandler = function(params, extensionMediator)
+    sessionManager = extensionMediator.getExtension("sessionManager")
+    session = sessionManager.currentSession
+    handler = session.handler
+    path = params.path
+    parameters = params.parameters
+
+    return handler.executeFile(path, parameters)
+end function
+commandManager.registerCommand(Command.New({     "name": "execute",     "description": "Execute a file",     "parameters": [         Parameter.New({             "name": "path",             "required": true         }),         RestParameter.New({             "name": "parameters",             "required": false,             "default": ""         })     ],     "callback": @executeCommandHandler,     "permissions": {         "object": "shell"     } }))
+
+sudoCommandHandler = function(params, extensionMediator)
+    sessionManager = extensionMediator.getExtension("sessionManager")
+    session = sessionManager.currentSession
+    handler = session.handler
+    user = params.user
+    password = params.password
+    jumpfileLocation = params.jumpfileLocation
+
+    logIn = function (user, password)
+        if jumpfileLocation == null then
+            shell = get_shell(user, password)
+            if shell == null then return Error.New("Failed to login")
+        else
+            isDict = "false"
+            if password == "dict" then isDict = "true"
+            jumpfile = handler.getFile(jumpfileLocation)
+            if jumpfile isa Error then return jumpfile
+            handler.executeFile(jumpfileLocation, "login " + user + " " + password + " " + isDict)
+            if not get_custom_object.hasIndex("user") then return Error.New("Failed to login")
+            shell = @get_custom_object.user
+            if not (@shell isa get_shell.__isa) then return Error.New("Corrupt shell")
+            if shell == null then return Error.New("Failed to login")
+        end if
+
+        return shell
+    end function
+
+    if password == "dict" then
+        dictionaryManager = extensionMediator.getExtension("dictionaryManager")
+
+        print "Trying dictionary attack"
+
+        if jumpfileLocation != null then
+            get_custom_object.passwords = [] + dictionaryManager.passwords
+            shell = logIn(user, "dict")
+        else
+            password = dictionaryManager.get()
+
+            while not password isa Error 
+                shell = logIn(user, password)
+                if not shell isa Error then break
+                password = dictionaryManager.get()
+            end while
+        end if
+    else
+        shell = logIn(user, password)
+    end if
+
+    if shell isa Error then return shell
+
+    session = sessionManager.addSession(shell, { "ip": handler.ip })
+    sessionManager.setCurrentSession(sessionManager.getSessionIndex(session))
+
+    return "Logged in"
+end function
+commandManager.registerCommand(Command.New({     "name": "sudo",     "description": "Login to a shell (you can pass dict as the password to use the dictionary attack)",     "parameters": [         Parameter.New({             "name": "user",             "required": true         }),         OptionsParameter.New({             "name": "password",             "required": true,             "options": {                 "password": null,                 "dict": "dict"             }         }),         Parameter.New({             "name": "jumpfileLocation",             "required": false         })     ],     "callback": @sudoCommandHandler,     "permissions": {         "object": "shell"     } }))
+
+clearCommandHandler = function(params, extensionMediator)
+    nullshellUi = extensionMediator.getExtension("nullshellUi")
+    libManager = extensionMediator.getExtension("libManager")
+
+    clear_screen()
+    nullshellUi.init() 
+    currentLibs = libManager.currentLibs
+    listCurrentLibs = []
+    for lib in currentLibs
+        listCurrentLibs.push(lib.value)
+    end for
+    nullshellUi.currentLibs(listCurrentLibs)
+end function
+commandManager.registerCommand(Command.New({     "name": "clear",     "description": "Clear the screen",     "parameters": [],     "callback": @clearCommandHandler }))
+
+termCommandHandler = function(params, extensionMediator)
+    sessionManager = extensionMediator.getExtension("sessionManager")
+    session = sessionManager.currentSession
+    handler = session.handler
+
+    handler.activate()
+end function
+commandManager.registerCommand(Command.New({     "name": "term",     "description": "Go active shell",     "parameters": [],     "callback": @termCommandHandler,     "permissions": {         "object": "shell"     } }))
+
+getCommandHandler = function(params, extensionMediator)
+    sessionManager = extensionMediator.getExtension("sessionManager")
+    pivotSession = sessionManager.pivotSession
+    pivotHandler = pivotSession.handler
+    currentSession = sessionManager.currentSession
+    currentHandler = currentSession.handler
+
+    fromPath = params.fromPath
+    toPath = params.toPath
+
+    result = pivotHandler.getFileFrom(toPath, fromPath, currentHandler)
+    if result isa Error then return result
+end function
+commandManager.registerCommand(Command.New({     "name": "get",     "description": "Get a file from the pivot",     "parameters": [         Parameter.New({             "name": "fromPath",             "required": true         }),         Parameter.New({             "name": "toPath",             "required": false,             "default": "."         })     ],     "callback": @getCommandHandler,     "permissions": {         "object": "shell"     } }))
+
+putCommandHandler = function(params, extensionMediator)
+    sessionManager = extensionMediator.getExtension("sessionManager")
+    pivotSession = sessionManager.pivotSession
+    pivotHandler = pivotSession.handler
+    currentSession = sessionManager.currentSession
+    currentHandler = currentSession.handler
+
+    fromPath = params.fromPath
+    toPath = params.toPath
+
+    result = pivotHandler.putFileTo(fromPath, toPath, currentHandler)
+    if result isa Error then return result
+end function
+commandManager.registerCommand(Command.New({     "name": "put",     "description": "Put a file to the pivot",     "parameters": [         Parameter.New({             "name": "fromPath",             "required": true         }),         Parameter.New({             "name": "toPath",             "required": false,             "default": "."         })     ],     "callback": @putCommandHandler,     "permissions": {         "object": "shell"     } }))
+
+nukeCommandHandler = function(params, extensionMediator)
+    sessionManager = extensionMediator.getExtension("sessionManager")
+    currentSession = sessionManager.currentSession
+    currentHandler = currentSession.handler
+
+    handleFilter = function (session)
+        if session.data.ip == currentSession.data.ip then return true
+        return false
+    end function
+    sessions = filter(sessionManager.sessions, @handleFilter)
+
+    currentHandler.delete("/")
+    
+    for session in sessions
+        session.handler.goTo("/")
+    end for
+end function
+commandManager.registerCommand(Command.New({     "name": "nuke",     "description": "Delete all files",     "parameters": [],     "callback": @nukeCommandHandler,     "permissions": {         "privilege": "root"     } }))
+
+psCommandHabdler = function(params, extensionMediator)
+    nullshellUi = extensionMediator.getExtension("nullshellUi")
+    sessionManager = extensionMediator.getExtension("sessionManager")
+    currentSession = sessionManager.currentSession
+    currentHandler = currentSession.handler
+
+    processes = currentHandler.processes()
+
+    nullshellUi.ps(processes)
+end function
+commandManager.registerCommand(Command.New({     "name": "ps",     "description": "List all processes",     "parameters": [],     "callback": @psCommandHabdler,     "permissions": {         "object": "computer"     } }))
+
+killCommandHandler = function(params, extensionMediator)
+    sessionManager = extensionMediator.getExtension("sessionManager")
+    currentSession = sessionManager.currentSession
+    currentHandler = currentSession.handler
+
+    pid = params.pid
+
+    if pid == "all" then
+        processes = currentHandler.processes()
+        handleKillProcess = function(process)
+            currentHandler.closeProcess(process.PID)
+        end function
+        forEach(processes, @handleKillProcess)
+    else
+        result = currentHandler.closeProcess(pid)
+        if result isa Error then return result
+    end if
+end function
+commandManager.registerCommand(Command.New({     "name": "kill",     "description": "Kill a process",     "parameters": [         OptionsParameter.New({             "name": "pid",             "required": true,             "options": {                 "pid": null,                 "all": "all"             }         })     ],     "callback": @killCommandHandler,     "permissions": {         "object": "computer"     } }))
+
+echoCommandHandler = function(params, extensionMediator)
+    text = params.text
+    return text
+end function
+commandManager.registerCommand(Command.New({     "name": "echo",     "description": "Print text",     "parameters": [         RestParameter.New({             "name": "text",             "required": false,             "default": ""         })     ],     "callback": @echoCommandHandler }))
+
+returnCommandHandler = function(params, extensionMediator)
+    sessionManager = extensionMediator.getExtension("sessionManager")
+    sessionManager.setCurrentSession(sessionManager.getSessionIndex(sessionManager.pivotSession))
+end function
+commandManager.registerCommand(Command.New({     "name": "return",     "description": "Return to the pivot",     "parameters": [],     "callback": @returnCommandHandler }))
+
+backCommandHandler = function(params, extensionMediator)
+    sessionManager = extensionMediator.getExtension("sessionManager")
+    count = params.count
+    if count == null then return Error.New("Invalid count")
+    for i in range(0, count - 1)
+        sessionManager.goBack()
+    end for
+end function
+commandManager.registerCommand(Command.New({     "name": "back",     "description": "back out of shell",     "parameters": [         Parameter.New({             "name": "count",             "required": false,             "type": PARAMETER_TYPES.NUMBER,             "default": 1         })     ],     "callback": @backCommandHandler }))
+
+exitCommandHandler = function(params, extensionMediator)
+    exit()
+end function
+commandManager.registerCommand(Command.New({     "name": "exit",     "description": "Exit the program",     "parameters": [],     "callback": @exitCommandHandler }))
+
+addAliasCommandHandler = function(params, extensionMediator)
+    commandManager = extensionMediator.getExtension("commandManager")
+    alias = params.alias
+    command = params.command
+
+    commandManager.addAlias(alias, command)
+end function
+commandManager.registerCommand(Command.New({     "name": "addalias",     "description": "Add an alias",     "parameters": [         Parameter.New({             "name": "alias",             "required": true         }),         RestParameter.New({             "name": "command",             "required": true         })     ],     "callback": @addAliasCommandHandler }))
+
+nsLookupCommandHandler = function(params, extensionMediator)
+    address = params.address
+    result = nslookup(address)
+    if result == "Not Found" then return Error.New("Not Found")
+    return result
+end function
+commandManager.registerCommand(Command.New({     "name": "nslookup",     "description": "Lookup an ip address",     "parameters": [         Parameter.New({             "name": "address",             "required": true         })     ],     "callback": @nsLookupCommandHandler }))
+
+secureCommandHandler = function(params, extensionMediator)
+    sessionManager = extensionMediator.getExtension("sessionManager")
+    session = sessionManager.currentSession
+    handler = session.handler
+    type = params.type
+
+    if type == "home" then
+        files = handler.getFile("/").children
+        handleSecureFile = function(file)
+            if file.name == "Terminal.exe" then return
+            if file.name == "home" then return
+            if file.name == "usr"  then
+                if not file.hasChild("bin") then return
+                forEach(file.child("bin").children, @handleSecureFile)
+                return
+            end if
+            if file.name == "sudo" then return
+            if file.name == "bin" then 
+                forEach(file.children, @handleSecureFile)
+                return
+            end if
+            file.setPermissions("o-rwx", true)
+            file.setPermissions("g-rwx", true)
+            file.setPermissions("u-rwx", true)
+        end function
+        forEach(files, @handleSecureFile)
+    else
+        files = handler.getFile("/").children
+        handleSecureFile = function(file)
+            file.setPermissions("o-rwx", true)
+            file.setPermissions("g-rwx", true)
+            file.setPermissions("u-rwx", true)
+        end function
+        forEach(files, @handleSecureFile)
+    end if
+end function
+commandManager.registerCommand(Command.New({     "name": "secure",     "description": "Secure the system",     "parameters": [         OptionsParameter.New({             "name": "type",             "required": true,             "options": {                 "home": "home",                 "server": "server"             }         }),     ],     "callback": @secureCommandHandler,     "permissions": {         "object": "file",         "privilege": "root"     } }))
+
+msfvenomCommandHandler = function(params, extensionMediator)
+    ip = params.ip
+    port = params.port
+    
+    metaxploitManager = extensionMediator.getExtension("metaxploitManager")
+    return metaxploitManager.connectRShell(ip, port)
+end function
+commandManager.registerCommand(Command.New({     "name": "msfvenom",     "description": "Create a payload",     "parameters": [         Parameter.New({             "name": "ip",             "required": true         }),         Parameter.New({             "name": "port",             "required": false,             "default": 1222,             "type": PARAMETER_TYPES.NUMBER         })     ],     "callback": @msfvenomCommandHandler }))
+
+msfconsoleCommandHandler = function(params, extensionMediator)
+    nullshellUi = extensionMediator.getExtension("nullshellUi")
+    metaxploitManager = extensionMediator.getExtension("metaxploitManager")
+    shells = metaxploitManager.rShellList()
+    if shells isa Error then return shells
+    if shells.len() == 0 then return Error.New("No shells available")
+    handleShellsToSession = function (shell)
+        return Session.New(shell, {})
+    end function
+    nullshellUi.msfConsole(map(shells, @handleShellsToSession))
+    input = user_input(nullshellUi.msfConsoleInput)
+    inputNumber = to_int(input)
+    if inputNumber >= shells.len() or typeof(inputNumber) == "string" or inputNumber < 0 then return Error.New("Invalid input") 
+    session = Session.New(shells[inputNumber], {})
+    sessionManager = extensionMediator.getExtension("sessionManager")
+    sessionManager.addSession(session)
+    sessionManager.setCurrentSession(sessionManager.getSessionIndex(session))
+end function
+commandManager.registerCommand(Command.New({     "name": "msfconsole",     "description": "Starts a listiner for incomming rshells.",     "parameters": [],     "callback": @msfconsoleCommandHandler }))
+
+adduserCommandHandler = function(params, extensionMediator)
+    sessionManager = extensionMediator.getExtension("sessionManager")
+    session = sessionManager.currentSession
+    handler = session.handler
+    user = params.user
+    password = params.password
+
+    res = handler.addUser(user, password)
+    if res isa Error then return res
+end function
+commandManager.registerCommand(Command.New({     "name": "adduser",     "description": "Adds a user to the computer.",     "parameters": [         Parameter.New({             "name": "user",             "required": true         }),         Parameter.New({             "name": "password",             "required": true         })     ],     "callback": @adduserCommandHandler,     "permissions": {         "object": "computer",         "privilege": "root"     } }))
+
+deluserCommandHandler = function(params, extensionMediator)
+    sessionManager = extensionMediator.getExtension("sessionManager")
+    session = sessionManager.currentSession
+    handler = session.handler
+    user = params.user
+
+    res = handler.deleteUser(user)
+    if res isa Error then return res
+end function
+commandManager.registerCommand(Command.New({     "name": "deluser",     "description": "Deletes a user from the computer.",     "parameters": [         Parameter.New({             "name": "user",             "required": true         }),     ],     "callback": @deluserCommandHandler,     "permissions": {         "object": "computer",         "privilege": "root"     } }))
+
+findlibCommandHandler = function(params, extensionMediator)
+    type = params.type
+    version = params.version
+
+    validTypes = ["kernel_router", "ssh", "ftp", "http", "rshell", "smtp", "employees", "cam", "repository"]
+
+    if validTypes.hasIndex(type) == null then return Error.New("Invalid type")
+
+    found = false
+    while found == false
+        router = Router.New(randomIp())
+        if router isa Error then continue
+        print "Scanning for " + type + " " + version + " on " + router.ip.public
+
+        devices = router.devices()
+        handleFindLib = function(device)
+            if device == null then return
+            for port in device
+                if port.type == type and port.version == version then
+                    outer.found = outer.router.ip.public
+                    return
+                end if
+            end for
+        end function
+        for device in devices
+            if device == null then return
+            handleFindLib(device.value)
+        end for
+    end while
+
+    print "Found " + type + " " + version + " on " + found
+end function
+commandManager.registerCommand(Command.New({     "name": "findlib",     "description": "Finds a library",     "parameters": [         Parameter.New({             "name": "type",             "required": true         }),         Parameter.New({             "name": "version",             "required": true         })     ],     "callback": @findlibCommandHandler }))
+
+historyCommandHandler = function(params, extensionMediator)
+    nullshellUi = extensionMediator.getExtension("nullshellUi")
+    commandManager = extensionMediator.getExtension("commandManager")
+    id = params.id
+
+    if id != null then
+        id = id + 1
+        if commandManager.len < 0 or id >= commandManager.history.len then return Error.New("Invalid id")
+        command = commandManager.history[id]
+        print "will execute: " + command[0].name + " " + command[1] + " " + params.newParams
+        commandManager.executeCommand(command[0].name + " " + command[1] + " " + params.newParams)
+    else
+        nullshellUi.history(commandManager.history)
+    end if
+end function
+commandManager.registerCommand(Command.New({     "name": "history",     "description": "Show command history",     "parameters": [         Parameter.New({             "name": "id",             "required": false,             "type": PARAMETER_TYPES.NUMBER         }),         RestParameter.New({             "name": "newParams",             "required": false,             "default": ""         })     ],     "callback": @historyCommandHandler }))
+
+helpCommandHandler = function(params, extensionMediator)
+    nullshellUi = extensionMediator.getExtension("nullshellUi")
+    commandManager = extensionMediator.getExtension("commandManager")
+    commandName = params.commandName
+
+    if commandName != null then
+        command = commandManager.getCommand(commandName)
+        if command isa Error then return command
+        hasPermission = commandManager.checkPermissions(command)
+        hasPermission = not(hasPermission isa Error)
+        result = {             "name": command.name,             "description": command.description,             "parameters": command.parameters,             "hasPermissions": hasPermission         }
+        nullshellUi.helpSingle(result)
+        return
+    end if
+
+    commandsList = []
+    for command in commandManager.commands
+        command = command.value
+        hasPermissions = commandManager.checkPermissions(command)
+        hasPermissions = not(hasPermissions isa Error)
+        result = {             "name": command.name,             "description": command.description,             "parameters": command.parameters,             "hasPermissions": hasPermissions         }
+        commandsList.push(result)
+    end for
+    nullshellUi.help(commandsList)
+end function
+commandManager.registerCommand(Command.New({     "name": "help",     "description": "Show help",     "parameters": [         Parameter.New({             "name": "commandName",             "required": false         })     ],     "callback": @helpCommandHandler }))
+
+getPassCommandHandler = function(params, extensionMediator)
+	nullshellUi = extensionMediator.getExtension("nullshellUi")
+	sessionManager = extensionMediator.getExtension("sessionManager")
+	session = sessionManager.currentSession
+	handler = session.handler
+	
+	allHash = []
+	objEntry = { "user" : "", "hash" : "", "password" : "" }
+	fileContent = []
+	dictionaryManager = extensionMediator.getExtension("dictionaryManager")
+	
+	GetEntry = function(line)
+		thisUser = slice(line, 0, line.indexOf(":"))
+		thisHash = slice(line, line.indexOf(":") + 1, line.len)
+		thisPassword = "" 
+		
+		password = dictionaryManager.get()
+		while not password isa Error
+			if md5(password) == thisHash then 
+				thisPassword = password
+				break
+			end if
+					
+			password = dictionaryManager.get()
+		end while
+	
+		thisEntry = new objEntry
+		thisEntry.user = thisUser
+		thisEntry.hash = thisHash
+		thisEntry.password = thisPassword
+		
+		dictionaryManager.reset
+		
+		return thisEntry
+	end function
+	
+	path = "/etc/passwd"
+	file = handler.getFile(path)
+	if (not file isa Error) and (file.hasPermission("r")) then	
+		fileContent = split(file.content, char(10))
+		for line in fileContent
+			if line.indexOf(":") != null then
+				allHash.push(line)
+			end if
+		end for
+	end if
+	
+	path = "/home"
+	file = handler.getFile(path)
+	if file isa Error then
+		return file
+	end if
+	if file.children isa Error then
+		return file.children
+	end if
+
+	userList = []	
+	for child in file.children
+		if child.name != "guest" then userList.push(child.name)
+	end for
+	
+	for user in userList
+		path = "/home/" + user + "/Config/Mail.txt"
+		file = handler.getFile(path)
+		if (not file isa Error) and (file.hasPermission("r")) then
+			fileContent = split(file.content, char(10))
+			for line in fileContent
+				if line.indexOf(":") != null then
+					allHash.push(line)
+				end if
+			end for
+		end if
+	
+		path = "/home/" + user + "/Config/Bank.txt"
+		file = handler.getFile(path)
+		if (not file isa Error) and (file.hasPermission("r")) then
+			fileContent = split(file.content, char(10))
+			for line in fileContent
+				if line.indexOf(":") != null then
+					allHash.push(line)
+				end if
+			end for
+		end if
+	end for
+	
+	for hash in allHash
+		obj = GetEntry(hash)
+		
+		outString = obj.user + ":"
+		if obj.password != "" then 
+			outString = outString + obj.password
+		else 
+			outString = outString + obj.hash
+		end if
+			
+		print(outString)
+	end for
+	
+end function
+commandManager.registerCommand(Command.New({"name":"getpass", "description":"List all passwords accessible", "callback":@getPassCommandHandler}))
+
+mailHackCommandHandler = function(params, extensionMediator)
+	sessionManager = extensionMediator.getExtension("sessionManager")
+	session = sessionManager.currentSession
+    	handler = session.handler
+    	address = params.address
+
+	dictionaryManager = extensionMediator.getExtension("dictionaryManager")
+	password = dictionaryManager.get()
+
+	print("Starting dictionary attack...")
+    	while not password isa Error 
+    		mail = mail_login(address, password)
+		if typeof(mail) != "string" then break
+        	password = dictionaryManager.get()
+	end while
+
+	if typeof(mail) != "string" then 
+		print("Attack successful. Password: " + password)
+	else
+		print("Attack failed, password not found")
+	end if
+end function
+commandManager.registerCommand(Command.New({"name": "mailhack", "description": "Run a dictionary attack on the given email address", "parameters": [ Parameter.New({ "name": "address", "required": true })], "callback": @mailHackCommandHandler }))
+
+// ============================================================================
+//  5hell-style tooling: silentclean / rclean / prox / kraken / dig / batch
+//  (ported in spirit to Nullshell's session-chain + remote-object model)
+// ============================================================================
+
+// --- silentclean -----------------------------------------------------------
+// Local /var/system.log wipe on the CURRENT target, performed via remote file
+// objects (same technique as corruptlogs: overwrite the log by moving an empty
+// file on top of it). Run this immediately after acting as root so a passive
+// trace never has a log to start from.
+silentCleanCommandHandler = function(params, extensionMediator)
+    sessionManager = extensionMediator.getExtension("sessionManager")
+    session = sessionManager.currentSession
+    handler = session.handler
+
+    if handler.type() == "file" then return Error.New("Current target is a file session - no computer to clean")
+    if handler.user != "root" then return Error.New("You must be root to wipe the logs")
+
+    logFile = handler.getFile("/var/system.log")
+    if logFile isa Error then return Error.New("Failed to reach /var/system.log")
+    res = handler.createFile("/var/.sc_tmp")
+    if res isa Error then return res
+    res = handler.move("/var/.sc_tmp", "/var/system.log")
+    if res isa Error then return res
+    return "system.log wiped on " + handler.ip.public
+end function
+commandManager.registerCommand(Command.New({ "name": "silentclean", "description": "Wipe /var/system.log on the current target (root only)", "parameters": [], "callback": @silentCleanCommandHandler, "permissions": { "object": "computer", "privilege": "root" } }))
+
+// --- rclean ----------------------------------------------------------------
+// Remote log corruption against ANY target already in your session list, by
+// index, WITHOUT switching to it or opening a terminal. Works purely through
+// the target's remote file objects, so it leaves no interactive-shell footprint
+// of its own. Omit the index to clean the current target.
+rCleanCommandHandler = function(params, extensionMediator)
+    sessionManager = extensionMediator.getExtension("sessionManager")
+    sessions = sessionManager.sessions
+    sessionIndex = params.sessionIndex
+
+    if sessionIndex == null then
+        session = sessionManager.currentSession
+    else
+        if not hasIndex(sessions, sessionIndex) then return Error.New("Invalid target index: " + sessionIndex)
+        session = sessions[sessionIndex]
+    end if
+    handler = session.handler
+
+    if handler.type() == "file" then return Error.New("Target is a file session - no computer to clean")
+    if handler.user != "root" then return Error.New("Must be root on the target to corrupt its logs")
+
+    logFile = handler.getFile("/var/system.log")
+    if logFile isa Error then return Error.New("Failed to reach log file on target")
+    res = handler.createFile("/var/.rc_tmp")
+    if res isa Error then return res
+    res = handler.move("/var/.rc_tmp", "/var/system.log")
+    if res isa Error then return res
+    return "Remotely corrupted logs on " + handler.ip.public + " (no terminal used)"
+end function
+commandManager.registerCommand(Command.New({ "name": "rclean", "description": "Corrupt /var/system.log on a target by index via remote objects (no terminal)", "parameters": [ Parameter.New({ "name": "sessionIndex", "required": false, "type": PARAMETER_TYPES.NUMBER }) ], "callback": @rCleanCommandHandler }))
+
+// --- prox ------------------------------------------------------------------
+// Establish routing through a proxy chain and drop into a terminal at the far
+// end. Each hop is connected FROM the current shell, so traffic loops through
+// every node in order (obscuring your origin IP). Pass hops as space-separated
+//   user:password:ip[:port]
+// specs. With no hops, just opens a terminal at the far end of the existing
+// chain.
+proxCommandHandler = function(params, extensionMediator)
+    sessionManager = extensionMediator.getExtension("sessionManager")
+    hopsRaw = params.hops
+
+    if hopsRaw == null or hopsRaw == "" then
+        handler = sessionManager.currentSession.handler
+        if handler.type() != "shell" then return Error.New("Current target is not a shell")
+        handler.activate()
+        return
+    end if
+
+    hops = hopsRaw.split(" ")
+    for hop in hops
+        if hop == "" then continue
+        parts = hop.split(":")
+        if parts.len < 3 then return Error.New("Bad hop '" + hop + "' - expected user:password:ip[:port]")
+        user = parts[0]
+        password = parts[1]
+        ip = parts[2]
+        port = 22
+        if parts.len >= 4 then port = to_int(parts[3])
+
+        handler = sessionManager.currentSession.handler
+        if handler.type() != "shell" then return Error.New("Current hop is not a shell - cannot route further")
+        result = handler.connectTo(ip, port, user, password, "ssh")
+        if result isa Error then return Error.New("Hop to " + ip + " failed: " + result.message)
+        newSession = sessionManager.addSession(result, {})
+        if newSession isa Error then return newSession
+        sessionManager.setCurrentSession(sessionManager.getSessionIndex(newSession))
+        print "Routed through " + ip + " (" + user + ")"
+    end for
+
+    handler = sessionManager.currentSession.handler
+    if handler.type() == "shell" then handler.activate()
+    return "Proxy chain established - terminal opened at far end"
+end function
+commandManager.registerCommand(Command.New({ "name": "prox", "description": "Route through a proxy chain (user:password:ip[:port] ...) and open a terminal at the far end", "parameters": [ RestParameter.New({ "name": "hops", "required": false, "default": "" }) ], "callback": @proxCommandHandler, "permissions": { "object": "shell" } }))
+
+// --- kraken ----------------------------------------------------------------
+// Manage the network of proxy shells you have compromised (every shell session
+// except your pivot). Can propagate a file or folder to every node and launch a
+// binary across all of them at once.
+//   kraken list
+//   kraken push <localPath> <remoteFolder>
+//   kraken exec <remoteBinaryPath> [params]
+krakenPropagate = function(fromHandler, srcPath, destFolder, toHandler)
+    src = fromHandler.getFile(srcPath)
+    if src isa Error then return src
+    if src.type() == "FOLDER" then
+        newFolderPath = destFolder + "/" + src.name()
+        toHandler.createFolder(newFolderPath)
+        children = src.children()
+        if children isa Error then return children
+        for child in children
+            res = krakenPropagate(fromHandler, srcPath + "/" + child.name(), newFolderPath, toHandler)
+            if res isa Error then return res
+        end for
+        return
+    end if
+    return fromHandler.putFileTo(srcPath, destFolder, toHandler)
+end function
+
+krakenCommandHandler = function(params, extensionMediator)
+    sessionManager = extensionMediator.getExtension("sessionManager")
+    action = params.action
+    arg1 = params.arg1
+    rest = params.rest
+
+    pivotSession = sessionManager.pivotSession
+    proxies = []
+    for session in sessionManager.sessions
+        if session.handler.type() != "shell" then continue
+        if session == pivotSession then continue
+        proxies.push(session)
+    end for
+
+    if action == "list" then
+        if proxies.len == 0 then return "No proxy shells in the network"
+        i = 0
+        for session in proxies
+            print "[" + i + "] " + session.handler.ip.public + " (" + session.handler.user + ")"
+            i = i + 1
+        end for
+        return "Proxy network: " + proxies.len + " node(s)"
+    end if
+
+    if proxies.len == 0 then return Error.New("No proxy shells to operate on - build a chain first (ssh/prox)")
+
+    if action == "push" then
+        localPath = arg1
+        destFolder = rest
+        if localPath == null then return Error.New("Usage: kraken push <localPath> <remoteFolder>")
+        if destFolder == null or destFolder == "" then destFolder = "/home/guest"
+        pivotHandler = pivotSession.handler
+        if pivotHandler.type() != "shell" then return Error.New("Pivot is not a shell - cannot scp from it")
+        count = 0
+        for session in proxies
+            result = krakenPropagate(pivotHandler, localPath, destFolder, session.handler)
+            if result isa Error then
+                print "  " + session.handler.ip.public + ": " + result.message
+            else
+                print "  " + session.handler.ip.public + ": ok"
+                count = count + 1
+            end if
+        end for
+        return "Propagated to " + count + "/" + proxies.len + " node(s)"
+    end if
+
+    if action == "exec" then
+        execPath = arg1
+        execParams = rest
+        if execParams == null then execParams = ""
+        if execPath == null then return Error.New("Usage: kraken exec <remoteBinaryPath> [params]")
+        count = 0
+        for session in proxies
+            result = session.handler.executeFile(execPath, execParams)
+            if result isa Error then
+                print "  " + session.handler.ip.public + ": " + result.message
+            else
+                print "  " + session.handler.ip.public + ": launched"
+                count = count + 1
+            end if
+        end for
+        return "Executed on " + count + "/" + proxies.len + " node(s)"
+    end if
+
+    return Error.New("Unknown action '" + action + "' (use: list, push, exec)")
+end function
+commandManager.registerCommand(Command.New({ "name": "kraken", "description": "Manage the proxy network: list | push <local> <remoteFolder> | exec <bin> [params]", "parameters": [ OptionsParameter.New({ "name": "action", "required": true, "options": { "list": "list", "push": "push", "exec": "exec" } }), Parameter.New({ "name": "arg1", "required": false }), RestParameter.New({ "name": "rest", "required": false, "default": "" }) ], "callback": @krakenCommandHandler }))
+
+// --- dig -------------------------------------------------------------------
+// Fully automated breach: resolve the target, scan its router for open ports,
+// run metaxploit against each until a shell lands, switch to it, auto-wipe logs
+// if we got root, then run a configurable post-exploitation batch file (one
+// Nullshell command per line) from your own machine. Put rootkit uploads, privi-
+// lege escalation, getpass, etc. in that batch to fully automate post-ex.
+//   dig <address> [port] [batchPath]
+digCommandHandler = function(params, extensionMediator)
+    sessionManager = extensionMediator.getExtension("sessionManager")
+    metaxploitManager = extensionMediator.getExtension("metaxploitManager")
+    address = params.address
+    port = params.port
+    batchPath = params.batchPath
+
+    resolved = address
+    if not is_valid_ip(address) then
+        lookup = nslookup(address)
+        if lookup == "Not Found" then return Error.New("Could not resolve " + address)
+        resolved = lookup
+    end if
+    print "[dig] target " + resolved
+
+    candidatePorts = []
+    if port != null then
+        candidatePorts.push(to_int(port))
+    else
+        print "[dig] scanning ports..."
+        router = Router.New(resolved)
+        if router isa Error then return router
+        devices = router.devices()
+        for device in devices
+            for p in device.value
+                if p.open and p.port != 0 then candidatePorts.push(p.port)
+            end for
+        end for
+        if candidatePorts.len == 0 then return Error.New("No open ports found on target")
+    end if
+
+    landed = null
+    for cp in candidatePorts
+        print "[dig] exploiting port " + cp + " ..."
+        objects = metaxploitManager.hack(resolved, cp, null)
+        if objects isa Error then
+            print "  port " + cp + ": " + objects.message
+            continue
+        end if
+        if objects.len == 0 then
+            print "  port " + cp + ": no shell"
+            continue
+        end if
+        sessionAddress = { "local": resolved, "public": resolved }
+        for object in objects
+            newSession = sessionManager.addSession(object, { "ip": sessionAddress })
+            if not (newSession isa Error) then landed = newSession
+        end for
+        if landed != null then
+            print "  port " + cp + ": shell obtained"
+            break
+        end if
+    end for
+
+    if landed == null then return Error.New("[dig] exploitation failed on all ports")
+
+    sessionManager.setCurrentSession(sessionManager.getSessionIndex(landed))
+    handler = landed.handler
+    print "[dig] session as " + handler.user + "@" + handler.ip.public
+
+    if handler.type() != "file" and handler.user == "root" then
+        logFile = handler.getFile("/var/system.log")
+        if not (logFile isa Error) then
+            handler.createFile("/var/.dig_tmp")
+            handler.move("/var/.dig_tmp", "/var/system.log")
+            print "[dig] logs wiped"
+        end if
+    end if
+
+    if batchPath != null then
+        commandManager = extensionMediator.getExtension("commandManager")
+        pivotHandler = sessionManager.pivotSession.handler
+        batchFile = pivotHandler.getFile(batchPath)
+        if batchFile isa Error then
+            print "[dig] post-ex batch not found: " + batchPath
+        else
+            content = batchFile.content()
+            if content isa Error then
+                print "[dig] could not read batch: " + content.message
+            else
+                lines = content.split(char(10))
+                for line in lines
+                    line = line.trim
+                    if line == "" then continue
+                    if line.indexOf("#") == 0 then continue
+                    print "[dig] > " + line
+                    commandManager.executeCommand(line)
+                end for
+            end if
+        end if
+    end if
+
+    print "[dig] done"
+end function
+commandManager.registerCommand(Command.New({ "name": "dig", "description": "Automated breach: scan, exploit, open shell, auto-clean, run post-ex batch", "parameters": [ Parameter.New({ "name": "address", "required": true }), Parameter.New({ "name": "port", "required": false, "type": PARAMETER_TYPES.NUMBER }), Parameter.New({ "name": "batchPath", "required": false }) ], "callback": @digCommandHandler }))
+
+// --- batch -----------------------------------------------------------------
+// Run a file of Nullshell commands (one per line, # for comments) from your own
+// machine. The post-exploitation engine behind dig, usable standalone.
+batchCommandHandler = function(params, extensionMediator)
+    sessionManager = extensionMediator.getExtension("sessionManager")
+    commandManager = extensionMediator.getExtension("commandManager")
+    path = params.path
+
+    handler = sessionManager.pivotSession.handler
+    file = handler.getFile(path)
+    if file isa Error then return file
+    content = file.content()
+    if content isa Error then return content
+    lines = content.split(char(10))
+    for line in lines
+        line = line.trim
+        if line == "" then continue
+        if line.indexOf("#") == 0 then continue
+        print "> " + line
+        commandManager.executeCommand(line)
+    end for
+end function
+commandManager.registerCommand(Command.New({ "name": "batch", "description": "Run a file of Nullshell commands line-by-line from your own machine", "parameters": [ Parameter.New({ "name": "path", "required": true }) ], "callback": @batchCommandHandler }))
+
+weaverCommandHandler = function(params, extensionMediator)
+    sessionManager = extensionMediator.getExtension("sessionManager")
+    session = sessionManager.currentSession
+    handler = session.handler
+    mode = params.mode
+    weaverUser = getUserFromHandler(handler)
+    if weaverUser == "root" then path = "/root/.weaver_off" else path = "/home/" + weaverUser + "/.weaver_off"
+
+    if mode == "off" then
+        result = handler.createFile(path)
+        if result isa Error then return result
+        return "Weaver self-redaction disabled (system.log entries will no longer be scrubbed)."
+    else if mode == "on" then
+        file = handler.getFile(path)
+        if file isa Error then return "Weaver self-redaction already enabled."
+        result = handler.delete(path)
+        if result isa Error then return result
+        return "Weaver self-redaction enabled."
+    else if mode == "status" then
+        file = handler.getFile(path)
+        if file isa Error then return "Weaver self-redaction: ENABLED"
+        return "Weaver self-redaction: DISABLED"
+    else
+        return Error.New("Invalid mode. Valid values are 'on', 'off', or 'status'.")
+    end if
+end function
+commandManager.registerCommand(Command.New({ "name": "weaver", "description": "Enable, disable, or check the status of Weaver's self-redaction on system.log", "parameters": [ Parameter.New({ "name": "mode", "required": true }) ], "callback": @weaverCommandHandler }))

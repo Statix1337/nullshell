@@ -1,0 +1,131 @@
+import_code("/lib/nullshell/libs/json.src")
+import_code("/lib/nullshell/libs/error.src")
+import_code("/lib/nullshell/libs/functional.src")
+import_code("/lib/nullshell/managers/command/command-manager.src")
+import_code("/lib/nullshell/managers/command/command.src")
+import_code("/lib/nullshell/mediator.src")
+import_code("/lib/nullshell/facades/computer-objects/file.src")
+import_code("/lib/nullshell/libs/ssv.src")
+import_code("/lib/nullshell/facades/computer-objects/computer.src")
+import_code("/lib/nullshell/facades/computer-objects/shell.src")
+import_code("/lib/nullshell/facades/computer-objects/computer-object-factory.src")
+import_code("/lib/nullshell/utils/string.src")
+import_code("/lib/nullshell/utils/climbFileToRoot.src")
+import_code("/lib/nullshell/utils/getUserFromHandler.src")
+import_code("/lib/nullshell/managers/session/file.src")
+import_code("/lib/nullshell/managers/session/computer.src")
+import_code("/lib/nullshell/managers/session/shell.src")
+import_code("/lib/nullshell/managers/session/session.src")
+import_code("/lib/nullshell/managers/session/session-manager.src")
+import_code("/lib/nullshell/facades/lib-objects/metaxploit.src")
+import_code("/lib/nullshell/facades/lib-objects/crypto.src")
+import_code("/lib/nullshell/managers/lib/lib-manager.src")
+import_code("/lib/nullshell/managers/lib/metaxploit-manager.src")
+import_code("/lib/nullshell/managers/theme/theme-manager.src")
+import_code("/lib/nullshell/managers/ui/nullshell-ui.src")
+import_code("/lib/nullshell/facades/network/router.src")
+import_code("/lib/nullshell/managers/macro/macro-manager.src")
+import_code("/lib/nullshell/managers/dictionary/list-1a.src")
+import_code("/lib/nullshell/managers/dictionary/list-1b.src")
+import_code("/lib/nullshell/managers/dictionary/list-2a.src")
+import_code("/lib/nullshell/managers/dictionary/list-2b.src")
+import_code("/lib/nullshell/managers/dictionary/list-3a.src")
+import_code("/lib/nullshell/managers/dictionary/list-3b.src")
+import_code("/lib/nullshell/managers/dictionary/list-4a.src")
+import_code("/lib/nullshell/managers/dictionary/list-4b.src")
+import_code("/lib/nullshell/managers/dictionary/list-5a.src")
+import_code("/lib/nullshell/managers/dictionary/list-5b.src")
+import_code("/lib/nullshell/managers/dictionary/list-6.src")
+import_code("/lib/nullshell/managers/dictionary/dictionary-manager.src")
+import_code("/lib/nullshell/managers/config/config-manager.src")
+import_code("/lib/nullshell/jumpfile/jumpfile-text.src")
+import_code("/lib/nullshell/utils/random-ip.src")
+
+extensionMediator = ExtensionMediator.New()
+
+commandManager = CommandManager.New()
+extensionMediator.addExtension("commandManager", commandManager)
+sessionManager = SessionManager.New()
+extensionMediator.addExtension("sessionManager", sessionManager)
+libManager = LibManager.New()
+extensionMediator.addExtension("libManager", libManager)
+metaxploitManager = MetaxploitManager.New()
+extensionMediator.addExtension("metaxploitManager", metaxploitManager)
+macroManager = MacroManager.New()
+extensionMediator.addExtension("macroManager", macroManager)
+dictionaryManager = DictionaryManager.New()
+extensionMediator.addExtension("dictionaryManager", dictionaryManager)
+themeManager = ThemeManager.New()
+extensionMediator.addExtension("themeManager", themeManager)
+nullshellUi = NullshellUi.New()
+extensionMediator.addExtension("nullshellUi", nullshellUi)
+configManager = ConfigManager.New()
+extensionMediator.addExtension("configManager", configManager)
+
+import_code("/lib/nullshell/commands.src")
+
+init = function()
+    nullshellUi = extensionMediator.getExtension("nullshellUi")
+    sessionManager = extensionMediator.getExtension("sessionManager")
+    libManager = extensionMediator.getExtension("libManager")
+    sessionManager.addSession(get_shell())
+
+    libManager = extensionMediator.getExtension("libManager")
+    metaxploit = sessionManager.currentSession.handler.getFile("metaxploit.so")
+    if metaxploit isa Error then metaxploit = sessionManager.currentSession.handler.getFile("/lib/metaxploit.so")
+    if not (metaxploit isa Error) then
+        meta = include_lib(metaxploit.path)
+        if meta != null then
+            libManager.addLib(meta, {                 "ip": sessionManager.currentSession.data.ip,                 "path": metaxploit.path(),             })
+        end if
+    end if
+
+    cryptoFile = sessionManager.currentSession.handler.getFile("crypto.so")
+    if cryptoFile isa Error then cryptoFile = sessionManager.currentSession.handler.getFile("/lib/crypto.so")
+    if not (cryptoFile isa Error) then
+        crypto = include_lib(cryptoFile.path)
+        if crypto != null then
+            libManager.addLib(crypto, {                 "ip": sessionManager.currentSession.data.ip,                 "path": cryptoFile.path(),             })
+        end if
+    end if
+
+    clear_screen()
+    nullshellUi.init()
+
+    currentLibs = libManager.currentLibs
+    listCurrentLibs = []
+    for lib in currentLibs
+        listCurrentLibs.push(lib.value)
+    end for
+    nullshellUi.currentLibs(listCurrentLibs)
+
+    macroManager = extensionMediator.getExtension("macroManager")
+    macros = macroManager.init()
+
+    configManager = extensionMediator.getExtension("configManager")
+    configManager.init()
+
+    themeManager = extensionMediator.getExtension("themeManager")
+    themeManager.init()
+end function
+
+main = function()
+    nullshellUi = extensionMediator.getExtension("nullshellUi")
+    commandManager = extensionMediator.getExtension("commandManager")
+    commandManager.run()
+
+    dictionaryManager = extensionMediator.getExtension("dictionaryManager")
+    dictionaryManager.reset()
+
+    sessionManager = extensionMediator.getExtension("sessionManager")
+
+    userInput = user_input(nullshellUi.displaySession(sessionManager.currentSession))
+
+    result = commandManager.executeCommand(userInput)
+end function
+
+init()
+
+while(true)
+    main()
+end while
